@@ -84,7 +84,7 @@ Then, the cross validation is performed using `split_test` data set.
 predModel<-predict(rfModel, newdata = split_test, type = "class")
 confusionMatrix(predModel,split_test$classe)
 ```
-The confusion matrix shows a 99.95% prediction accuracy for the test set.
+The confusion matrix shows a 99.95% prediction accuracy for the test set. The out-of-sample error is estimated in 0.5%
 
 ## Predicting variables using the testing data set
 
