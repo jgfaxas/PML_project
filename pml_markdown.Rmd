@@ -1,0 +1,123 @@
+---
+title: "Practical machine learning project"
+author: "J.G.Faxas-Guzmán"
+date: "22 de octubre de 2015"
+output: html_document
+---
+
+## Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+## Loading data
+
+First step is to load the training data. Asumming the file is in the working directory, we use the function `read.csv` :
+
+```{r,cache=TRUE}
+# Loading data
+
+train<-read.csv("pml-training.csv")
+
+```
+This data is used to train our model and do the cross-validation of it.
+
+## Cleaning the data
+From the training set, we have removed the variables with a near zero variance, a high percentage of NA's values (90%) and the variables "X" and "user_name", which are an index and the user names respectivelly.
+
+```{r,cache=TRUE}
+# Removing near zero variance variables
+library(caret)
+nzv<-nearZeroVar(train)
+train<-train[,-nzv]
+
+# Removing ID variable "X", and "user_name" variable
+train=train[!(names(train) %in% c("X","user_name"))]
+
+# Removing variables with a very high percentage of NA (higher than 80%)
+numNA<-colSums(is.na(train))
+train<-train[names(numNA[((numNA/dim(train)[1])<0.8)])]
+```
+
+After data cleaning,  the variable `cvtd_timestamp` is convert from factor to Date class.
+```{r}
+# Changing the cvtd timestamp from factor to Date
+train$cvtd_timestamp<- as.Date(train$cvtd_timestamp, format = "%d/%m/%Y %H:%M")
+```
+
+Now the data is ready to the next step.
+
+## Cross-validation and model generation
+
+After data cleaning, the training data set is randomly splited into a train set and test set to perform a cross-validation process.
+
+```{r}
+# spliting the data
+library(caTools) #For split the data. I could have used caret package, but I like this one.
+set.seed(3000)
+spl = sample.split(train$classe, SplitRatio = 0.7)
+split_train = subset(train, spl==TRUE)
+split_test = subset(train, spl==FALSE)
+```
+Using `split_train` data set and `randomForest` library, a prediction model has been create:
+
+```{r,cache=TRUE}
+library(randomForest) # An efficient library to create a tree using random forest
+set.seed(111)
+rfModel<-randomForest(classe~.,split_train,keep.forest=TRUE)
+
+```
+
+Then, the cross validation is performed using `split_test` data set.
+```{r,cache=TRUE}
+
+predModel<-predict(rfModel, newdata = split_test, type = "class")
+confusionMatrix(predModel,split_test$classe)
+```
+The confusion matrix shows a 99.95% prediction accuracy for the test set.
+
+## Predicting variables using the testing data set
+
+To complete the assignment,  we need to predict 20 cases presented in the testing set:
+
+```{r}
+#Loading the data
+test<-read.csv("pml-testing.csv")
+```
+
+The predictors used to developing the model are selected in the testing set and  the timestamp factor is changed to Date format:
+```{r}
+test<-test[names(train)[1:56]]
+test$cvtd_timestamp<- as.Date(test$cvtd_timestamp, format = "%d/%m/%Y %H:%M")
+```
+
+Finally, the prediction using data from the new dataset is performed:
+
+```{r,cache=TRUE}
+answers<-predict(rfModel, newdata = test, type = "class")  
+answers
+```
+
+To generate the files needed to submit the assignment, this function is used:
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(answers)
+```
